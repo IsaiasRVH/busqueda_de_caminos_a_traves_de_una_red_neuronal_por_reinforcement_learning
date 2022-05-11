@@ -1,7 +1,9 @@
+from cmath import sqrt
 import time
+from tkinter import NONE
 
 import numpy as np
-from math import sin, cos
+from math import asin, sin, cos
 
 import gym
 from gym import error, spaces, utils
@@ -15,6 +17,7 @@ class VirtualWorldEnv(gym.Env):
         self.action_space = spaces.Discrete(4)
         self.world_size_x = 50
         self.world_size_y = 50
+        
         self.reset()
         self.STEP_LIMIT = 1000
         self.sleep = 0
@@ -24,19 +27,53 @@ class VirtualWorldEnv(gym.Env):
             self.move(action)
         elif action == 2 or action == 3:
             self.rotate(action)
+        self.action_count+=1    
+        reward = self.reward_handler()
+        
+        distance_to_objective = sqrt((self.agent_pos[0] - self.world_objective[0])**2 + (self.agent_pos[1] - self.world_objective[1])**2)
+        rotation_respect_to_objective = self.calculate_rotation_respect_to_objective(distance_to_objective, self.agent_pos, self.world_objective, self.agent_rot)
+        
+        observation = [distance_to_objective, rotation_respect_to_objective, self.agent_bounding]
+        
+        reward, done = self.sim_over(reward)
+        
+        info = {"steps":self.action_count}
+        
+        time.sleep(self.sleep)
+        
+        return observation, reward, done, info
                 
     
     def reward_handler(self):
-        pass
+        if self.agent_bounding[0] == 1 or self.agent_bounding[1] == 1 or self.agent_bounding[2] == 1 or self.agent_bounding[3] == 1:
+            return -1
+        else :
+            if (self.agent_pos == self.world_objective):
+                return 1
+            else:
+                return -0.05
+        
     
     def sim_over(self, reward):
-        pass
+        if self.agent_pos[0] < 0 or self.agent_pos[0] > self.world_size_x or self.agent_pos[1] < 0 or self.agent_pos[1] > self.world_size_y:
+            return -10, True
+        if self.agent_pos == self.world_objective:
+            return reward, True
+        else:
+            return reward, False
     
     def reset(self):
+        self.action_count = 0
         self.world = self.load_world()
-        self.agent_pos = [1,1]
+        self.agent_pos = [23,12]
         self.agent_rot = 0
         self.agent_bounding = [0, 0, 0, 0]
+        self.world_objective = [38, 44]
+        distance_to_objective = sqrt((self.agent_pos[0] - self.world_objective[0])**2 
+                                     + (self.agent_pos[1] - self.world_objective[1])**2)
+        rotation_respect_to_objective = self.calculate_rotation_respect_to_objective(
+            distance_to_objective, self.agent_pos, self.world_objective, self.agent_rot)
+        return [distance_to_objective, rotation_respect_to_objective, self.agent_bounding]
     
     def close(self):
         pass
@@ -247,6 +284,22 @@ class VirtualWorldEnv(gym.Env):
         return new_rot
     
     @staticmethod
+    def calculate_rotation_respect_to_objective(self, distance, agent_pos, world_objective, agent_rot):
+        x = world_objective[0] - agent_pos[0]
+        y = world_objective[1] - agent_pos[1]
+        
+        if x >= 0 and y >= 0:
+            rotation = abs(asin(x/distance) - agent_rot)
+        elif x >= 0 and y < 0:
+            rotation = abs(asin(y/distance) + 90 - agent_rot)
+        elif x < 0 and y < 0:
+            rotation = abs(asin(x/distance) + 180 - agent_rot)
+        else:
+            rotation = abs(asin(y/distance) + 270 - agent_rot)
+        
+        return rotation
+    
+    @staticmethod
     def load_world(self):
         img = Image.open("escenarios/escenario_poblado_1.png")
         imgArray = np.array(img)
@@ -258,6 +311,6 @@ class VirtualWorldEnv(gym.Env):
             nextRow = []
             for element in row:
                 nextRow.append(element[0])
-            img2D.append(nextRow)
+            img2D.insert(0, nextRow)
         
         return img2D
