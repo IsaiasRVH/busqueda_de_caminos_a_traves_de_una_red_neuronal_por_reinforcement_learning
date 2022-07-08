@@ -18,7 +18,7 @@ class VirtualWorldEnv(gym.Env):
         self.world_size_y = 50
         
         self.reset()
-        self.STEP_LIMIT = 10000
+        self.STEP_LIMIT = 50000
         self.sleep = 0
         
     def step(self, action):
@@ -26,20 +26,26 @@ class VirtualWorldEnv(gym.Env):
             self.move(action)
         elif action == 2 or action == 3:
             self.rotate(action)
-        self.action_count+=1    
+        self.steps+=1
         reward = self.reward_handler()
         
         distance_to_objective = sqrt((self.agent_pos[0] - self.world_objective[0])**2 + (self.agent_pos[1] - self.world_objective[1])**2)
         rotation_respect_to_objective = self.calculate_rotation_respect_to_objective(distance_to_objective, self.agent_pos, self.world_objective, self.agent_rot)
         
+        #print(f'Act: {action}\tPos: {self.agent_pos}\tRot: {self.agent_rot}')  
+
         observation = [distance_to_objective, rotation_respect_to_objective, self.agent_bounding[0],self.agent_bounding[1], self.agent_bounding[2], self.agent_bounding[3]]
         
         reward, done = self.sim_over(reward)
         
-        info = {"steps":self.action_count}
+        info = {"steps":self.steps}
         
         time.sleep(self.sleep)
+
+        self.agent_path.append(self.agent_pos)
         
+        
+
         return observation, reward, done, info
                 
     
@@ -50,21 +56,26 @@ class VirtualWorldEnv(gym.Env):
             if (self.agent_pos == self.world_objective):
                 return 1
             else:
-                return -0.5
+                return -0.001
         
     
     def sim_over(self, reward):
         if self.agent_pos[0] < 0 or self.agent_pos[0] > self.world_size_x or self.agent_pos[1] < 0 or self.agent_pos[1] > self.world_size_y:
-            return -10, True
+            return -100, True
+            
+        if self.STEP_LIMIT == self.steps:
+            return reward, True
         if self.agent_pos == self.world_objective:
             return reward, True
         else:
             return reward, False
     
     def reset(self):
-        self.action_count = 0
+        self.steps = 0
+        self.agent_path = []
         self.world = self.load_world()
         self.agent_pos = [23,12]
+        self.agent_path.append(self.agent_pos)
         self.agent_rot = 0
         self.agent_bounding = [0, 0, 0, 0]
         self.world_objective = [38, 44]
@@ -243,11 +254,9 @@ class VirtualWorldEnv(gym.Env):
         # Si el agente esta fuera del escenario retorna todas las
         # colisiones activadas.
         if agent_pos[0] < 0 or agent_pos[0] > len(world[0]):
-            print("Bounds eje x")
             return [1,1,1,1]
             
         if agent_pos[1] < 0 or agent_pos[1] > len(world[1]):
-            print("Bounds eje x")
             return [1,1,1,1]
 
         
@@ -607,3 +616,6 @@ class VirtualWorldEnv(gym.Env):
                   1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 
                   0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]]
         return world
+
+def render(self, mode = 'human'):
+    pass
